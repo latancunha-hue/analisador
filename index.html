@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Meta Tags para Redes Sociais -->
+    <title>Painel do JR - Segurança Digital</title>
+    <meta name="description" content="Sistema de combate a golpistas e criminosos. Ajude a manter a rede segura.">
+    <meta property="og:title" content="Painel do JR - Contra Golpistas">
+    <meta property="og:description" content="Denúncias rápidas e blacklist de criminosos.">
+    <meta property="og:type" content="website">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
+        :root { --primary: #00d4ff; --danger: #ff004c; --bg-dark: #020617; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color: #f1f5f9; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .badge-banned { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <header class="p-6 border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 p-2 rounded shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-orbitron font-bold tracking-tighter bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent uppercase italic">Painel do JR</h1>
+            </div>
+            <div class="text-right">
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest">SERVIDOR GLOBAL ATIVO</p>
+                <p class="text-xs font-bold text-green-400">STATUS: PROTEGIDO</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 md:p-8">
+        
+        <nav class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
+            <button onclick="openTab('denuncias')" class="tab-btn active glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-blue-500" data-tab="denuncias">
+                <span>📋</span> <span class="text-[10px] font-bold uppercase">Denúncias</span>
+            </button>
+            <button onclick="openTab('consulta')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-blue-400" data-tab="consulta">
+                <span>🔍</span> <span class="text-[10px] font-bold uppercase">Consulta</span>
+            </button>
+            <button onclick="openTab('blacklist')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-red-500" data-tab="blacklist">
+                <span>💀</span> <span class="text-[10px] font-bold uppercase">Blacklist</span>
+            </button>
+            <button onclick="openTab('depoimentos')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-green-500" data-tab="depoimentos">
+                <span>💬</span> <span class="text-[10px] font-bold uppercase">Depoimentos</span>
+            </button>
+            <button onclick="openTab('adulto')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-purple-500" data-tab="adulto">
+                <span>🔞</span> <span class="text-[10px] font-bold uppercase">Conteúdo+18</span>
+            </button>
+            <button onclick="openTab('suporte')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-white" data-tab="suporte">
+                <span>📩</span> <span class="text-[10px] font-bold uppercase">Suporte</span>
+            </button>
+        </nav>
+
+        <div id="main-content">
+            <!-- ABA DENUNCIAS -->
+            <div id="denuncias" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-card p-6 rounded-2xl border-l-4 border-blue-500">
+                        <h3 class="font-bold text-blue-400 mb-4 uppercase">Modelo Anti-Golpe</h3>
+                        <textarea id="txt-golpe" readonly class="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-blue-200 mb-4">Suporte do WhatsApp, denuncio o número +55 (XX) XXXXX-XXXX por atividades de fraude e venda de golpes financeiros. Violação direta dos termos.</textarea>
+                        <button onclick="copyToClipboard('txt-golpe')" class="w-full bg-blue-600 py-2 rounded font-bold text-xs uppercase">Copiar Script</button>
+                    </div>
+                    <div class="glass-card p-6 rounded-2xl border-l-4 border-red-600 bg-red-900/10">
+                        <h3 class="font-bold text-red-500 mb-4 uppercase">URGENTE: Contra CP</h3>
+                        <textarea id="txt-cp" readonly class="w-full h-32 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-red-200 mb-4">DENÚNCIA URGENTE: Exploração infantil no número +55 (XX) XXXXX-XXXX. Solicito banimento imediato e preservação de dados conforme lei.</textarea>
+                        <button onclick="copyToClipboard('txt-cp')" class="w-full bg-red-600 py-2 rounded font-bold text-xs uppercase">Copiar Script</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA CONSULTA -->
+            <div id="consulta" class="tab-content">
+                <div class="glass-card p-10 rounded-2xl text-center max-w-2xl mx-auto">
+                    <h2 class="text-2xl font-orbitron font-bold text-blue-400 mb-6 uppercase">Consultar Blacklist</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="search-input" placeholder="DDD + Número" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 outline-none">
+                        <button onclick="searchNumber()" class="bg-blue-600 px-6 py-3 rounded-xl font-bold uppercase text-xs">Buscar</button>
+                    </div>
+                    <div id="search-result" class="mt-8 hidden p-4 rounded-xl border italic"></div>
+                </div>
+            </div>
+
+            <!-- ABA BLACKLIST -->
+            <div id="blacklist" class="tab-content">
+                <div class="glass-card p-6 rounded-2xl overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-800 text-[10px] tracking-widest uppercase">
+                            <tr><th class="p-4">NÚMERO</th><th class="p-4">MOTIVO</th><th class="p-4">STATUS</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800" id="blacklist-table">
+                            <tr><td class="p-4 font-mono text-blue-400">1193241XXXX</td><td class="p-4">Golpe CPX</td><td class="p-4"><span class="status-badge badge-banned">BANIDO</span></td></tr>
+                            <tr><td class="p-4 font-mono text-blue-400">2199912XXXX</td><td class="p-4">Conteúdo +18</td><td class="p-4"><span class="status-badge badge-banned">BANIDO</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA DEPOIMENTOS -->
+            <div id="depoimentos" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-card p-6 rounded-2xl italic text-xs text-slate-300">
+                        "O Painel do JR é a única ferramenta que realmente ensina como denunciar esses vagabundos. Parabéns!" - Anonimo.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ABA SUPORTE -->
+            <div id="suporte" class="tab-content">
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <a href="mailto:support@support.whatsapp.com" class="inline-block bg-blue-600 px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm">Enviar E-mail ao Suporte</a>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-20 py-10 border-t border-slate-900 text-center text-[10px] text-slate-600 font-orbitron italic">
+            PAINEL DO JR // JUSTIÇA COMUNITÁRIA // 2026
+        </footer>
+    </main>
+
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full font-bold text-xs opacity-0 transition-all pointer-events-none">COPIADO!</div>
+
+    <script>
+        const bannedNumbers = ["11932418888", "21999124433"];
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'border-blue-500'));
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active', 'border-blue-500');
+        }
+        function copyToClipboard(id) {
+            const text = document.getElementById(id).value;
+            navigator.clipboard.writeText(text);
+            const t = document.getElementById('toast');
+            t.style.opacity = '1'; setTimeout(() => t.style.opacity = '0', 2000);
+        }
+        function searchNumber() {
+            const num = document.getElementById('search-input').value.trim();
+            const res = document.getElementById('search-result');
+            res.classList.remove('hidden');
+            if (bannedNumbers.includes(num)) {
+                res.innerHTML = "⚠️ ALVO ENCONTRADO NA BLACKLIST!";
+                res.className = "mt-8 p-4 rounded-xl border border-red-500 text-red-500 font-bold";
+            } else {
+                res.innerHTML = "✅ NÚMERO LIMPO NA NOSSA BASE.";
+                res.className = "mt-8 p-4 rounded-xl border border-green-500 text-green-500 font-bold";
+            }
+        }
+    </script>
+</body>
+</html>
+
+  
