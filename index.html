@@ -1,322 +1,384 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <title>Painel do JR - Sistema de Segurança</title>
-    <meta name="description" content="Operação Limpeza Digital - Sistema de Denúncias Contra Criminosos.">
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
-        
-        :root {
-            --primary: #00d4ff;
-            --danger: #ff004c;
-            --bg-dark: #020617;
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot, 
+  addDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { 
+  ShieldAlert, 
+  Activity, 
+  Skull, 
+  Users, 
+  Terminal, 
+  Lock, 
+  User, 
+  Zap, 
+  Clock,
+  LogOut,
+  Database,
+  History,
+  Copy
+} from 'lucide-react';
+
+// Configuração do Firebase
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'jr-panel-pro-v5';
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isLogged, setIsLogged] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('metodo-api');
+  const [target, setTarget] = useState('');
+  const [consoleLogs, setConsoleLogs] = useState([]);
+  const [blacklist, setBlacklist] = useState([]);
+  const [systemLogs, setSystemLogs] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [toast, setToast] = useState({ show: false, msg: '' });
+
+  // Textos para facilitar a denúncia
+  const modelosDenuncia = [
+    { label: "C. Infantil", text: "Solicito banimento imediato deste número por compartilhamento de conteúdo infantil ilegal em grupos públicos. Violação grave dos termos." },
+    { label: "Fraude/Spam", text: "Este número está realizando ataques de phishing e spam em massa para roubo de contas. Solicito suspensão imediata." },
+    { label: "Ameaça", text: "Número identificado em conduta de ódio e ameaças reais à integridade física de membros de grupos." }
+  ];
+
+  // 1. Inicialização de Auth
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
+      } catch (err) {
+        console.error("Erro Auth:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setCurrentUser(u));
+    return () => unsubscribe();
+  }, []);
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-dark);
-            color: #f1f5f9;
+  // 2. Sincronização de Dados em Tempo Real
+  useEffect(() => {
+    if (!currentUser || !isLogged) return;
+
+    const unsubBlacklist = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'blacklist'),
+      (snap) => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setBlacklist(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+      },
+      (err) => console.error("Erro Blacklist:", err)
+    );
+
+    const unsubLogs = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'logs'),
+      (snap) => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setSystemLogs(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).slice(0, 50));
+      },
+      (err) => console.error("Erro Logs:", err)
+    );
+
+    let unsubUsers = () => {};
+    if (userName.toUpperCase() === 'JR') {
+      unsubUsers = onSnapshot(
+        collection(db, 'artifacts', appId, 'public', 'data', 'users'),
+        (snap) => {
+          setAdminUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        },
+        (err) => console.error("Erro Admin Users:", err)
+      );
+    }
+
+    return () => {
+      unsubBlacklist();
+      unsubLogs();
+      unsubUsers();
+    };
+  }, [currentUser, isLogged, userName]);
+
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    if (!userName.trim() || !password.trim()) return showToast("Dados incompletos!");
+    setLoading(true);
+    const userId = userName.trim().toLowerCase();
+    try {
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (userName.toUpperCase() === 'JR' && password !== '123') {
+        showToast("Senha de Desenvolvedor Inválida!");
+        setLoading(false);
+        return;
+      }
+      if (userSnap.exists()) {
+        if (userSnap.data().password !== password) {
+          showToast("Senha Incorreta!");
+          setLoading(false);
+          return;
         }
+      } else {
+        await setDoc(userRef, {
+          username: userName,
+          password: password,
+          createdAt: serverTimestamp(),
+          lastLogin: serverTimestamp()
+        });
+      }
+      await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
+        msg: `O Agente ${userName} acaba de se conectar.`,
+        type: 'login',
+        timestamp: serverTimestamp()
+      });
+      setIsLogged(true);
+      showToast("BEM-VINDO AO SISTEMA");
+    } catch (err) {
+      showToast("Falha na Rede");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+  const executeBan = async (motivo) => {
+    if (!target) return showToast("Define o Alvo!");
+    setConsoleLogs([]);
+    const sequence = [
+      "Iniciando Protocolo de Injeção...",
+      "Interceptando pacotes da API...",
+      `Injetando Payload: ${motivo}`,
+      "Multiplicando requisições (x150)...",
+      "Relatórios enviados com sucesso!"
+    ];
+    for (const text of sequence) {
+      setConsoleLogs(prev => [...prev, `[SYS] ${text}`]);
+      await new Promise(r => setTimeout(r, 450));
+    }
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'blacklist'), {
+      number: target,
+      motivo,
+      autor: userName,
+      timestamp: serverTimestamp()
+    });
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
+      msg: `Alvo ${target} banido por ${userName} (${motivo})`,
+      type: 'attack',
+      timestamp: serverTimestamp()
+    });
+    showToast("ALVO ATACADO!");
+    setTarget('');
+  };
 
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: slideUp 0.3s ease-out; }
+  const showToast = (msg) => {
+    setToast({ show: true, msg });
+    setTimeout(() => setToast({ show: false, msg: '' }), 3000);
+  };
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+  const copyToConsole = (text) => {
+    setConsoleLogs(prev => [...prev, `[COPY] Texto preparado: "${text.substring(0, 30)}..."`]);
+    showToast("Texto pronto no console!");
+  };
 
-        .glass-card {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(51, 65, 85, 0.5);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
-
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .badge-banned { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
-        .badge-pending { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #eab308; }
-        
-        textarea {
-            scrollbar-width: thin;
-            scrollbar-color: #1e293b #020617;
-        }
-    </style>
-</head>
-<body class="min-h-screen pb-10">
-
-    <!-- Header Centralizado -->
-    <header class="p-6 border-b border-slate-800 bg-slate-950/90 sticky top-0 z-50 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <div class="bg-blue-600 p-2 rounded shadow-[0_0_20px_rgba(37,99,235,0.6)]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-3xl font-orbitron font-bold tracking-tighter bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent uppercase italic">Painel do JR</h1>
-                    <p class="text-[10px] text-blue-500 font-bold tracking-[0.2em] uppercase">Módulo de Contenção Ativo</p>
-                </div>
+  if (!isLogged) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-slate-200">
+        <div className="w-full max-w-md bg-slate-900/40 border border-white/10 p-10 rounded-[3rem] backdrop-blur-3xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
+          <div className="flex flex-col items-center mb-10">
+            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/40 mb-6">
+              <Skull size={40} className="text-white" />
             </div>
-            <div class="flex flex-col items-center md:items-end">
-                <span class="text-[10px] text-slate-500 uppercase">Status do Servidor</span>
-                <span class="text-xs font-bold text-green-400 flex items-center gap-2">
-                    <span class="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span> OPERACIONAL
-                </span>
+            <h1 className="text-2xl font-black uppercase italic tracking-widest text-white">Painel JR <span className="text-blue-500">v5.2</span></h1>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Codinome</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Agente" className="w-full bg-black/40 border border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500 transition-all shadow-inner" />
+              </div>
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Chave de Segurança</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" className="w-full bg-black/40 border border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500 transition-all shadow-inner" />
+              </div>
+            </div>
+            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl shadow-2xl transition-all uppercase text-xs tracking-[0.2em] mt-4">
+              {loading ? "Acedendo..." : "Entrar no Sistema"}
+            </button>
+          </form>
         </div>
-    </header>
+      </div>
+    );
+  }
 
-    <main class="max-w-7xl mx-auto p-4 md:p-8">
-        
-        <!-- Menu de Navegação Superior -->
-        <nav class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
-            <button onclick="openTab('denuncias')" class="tab-btn active glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-blue-500" data-tab="denuncias">
-                <span class="text-xl">📋</span> <span class="text-[10px] font-bold uppercase">Scripts Ban</span>
+  return (
+    <div className="min-h-screen bg-[#020617] text-slate-300 font-sans">
+      <header className="p-4 bg-slate-900/60 border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/30">
+              <Zap size={22} className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-black text-xl italic uppercase leading-none text-white tracking-tighter">JR <span className="text-blue-500">PREMIUM</span></h1>
+              <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest mt-1">Sessão: {userName}</p>
+            </div>
+          </div>
+          <button onClick={() => window.location.reload()} className="bg-red-950/20 border border-red-500/30 p-2 px-4 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all text-[10px] font-bold uppercase flex items-center gap-2">
+            <LogOut size={14} /> Sair
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto p-4 md:p-10">
+        <nav className="flex gap-3 overflow-x-auto no-scrollbar mb-10 pb-2 text-slate-200">
+          {[
+            { id: 'metodo-api', label: 'Injeção API', icon: Terminal },
+            { id: 'blacklist', label: 'Blacklist', icon: Skull },
+            { id: 'monitoramento', label: 'Monitoramento', icon: Database },
+            { id: 'logs', label: 'Atividade', icon: History },
+            ...(userName.toUpperCase() === 'JR' ? [{ id: 'admin', label: 'Admin Root', icon: Users }] : [])
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all border-b-2 ${
+                activeTab === tab.id ? 'bg-blue-600/10 border-blue-600 text-blue-400 shadow-xl' : 'bg-slate-900/20 border-transparent text-slate-500 hover:bg-slate-900/40'
+              }`}
+            >
+              <tab.icon size={18} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.1em] whitespace-nowrap">{tab.label}</span>
             </button>
-            <button onclick="openTab('consulta')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-blue-400" data-tab="consulta">
-                <span class="text-xl">🔍</span> <span class="text-[10px] font-bold uppercase">Consulta</span>
-            </button>
-            <button onclick="openTab('blacklist')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-red-500" data-tab="blacklist">
-                <span class="text-xl">💀</span> <span class="text-[10px] font-bold uppercase">Blacklist</span>
-            </button>
-            <button onclick="openTab('depoimentos')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-green-500" data-tab="depoimentos">
-                <span class="text-xl">💬</span> <span class="text-[10px] font-bold uppercase">Depoimentos</span>
-            </button>
-            <button onclick="openTab('seguranca')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-yellow-500" data-tab="seguranca">
-                <span class="text-xl">🛡️</span> <span class="text-[10px] font-bold uppercase">Dicas</span>
-            </button>
-            <button onclick="openTab('suporte')" class="tab-btn glass-card p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-b-2 border-transparent hover:border-white" data-tab="suporte">
-                <span class="text-xl">📩</span> <span class="text-[10px] font-bold uppercase">Suporte</span>
-            </button>
+          ))}
         </nav>
 
-        <div id="main-content">
-
-            <!-- ABA 1: SCRIPTS DE BANIMENTO (Incluindo +18) -->
-            <div id="denuncias" class="tab-content active space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Script Golpe -->
-                    <div class="glass-card p-6 rounded-2xl border-l-4 border-blue-500 shadow-xl">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-blue-400 uppercase text-sm">Contra Fraudes / Golpes</h3>
-                            <button onclick="copyToClipboard('txt-golpe')" class="text-[10px] bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded-md font-bold uppercase transition">Copiar</button>
-                        </div>
-                        <textarea id="txt-golpe" readonly class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-blue-200 outline-none">Olá Suporte do WhatsApp, denuncio o número +55 (XX) XXXXX-XXXX por atividades de fraude e venda de golpes financeiros. Este usuário está enganando membros da comunidade e violando os Termos de Serviço.</textarea>
+        <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
+          {activeTab === 'metodo-api' && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="bg-slate-900/30 border border-white/5 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                <h3 className="text-center font-bold uppercase text-slate-500 text-[11px] mb-10 tracking-[0.4em]">Protocolo de Ataque API</h3>
+                <div className="space-y-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-600 ml-2">ID do Alvo</label>
+                    <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="55119..." className="w-full bg-black/50 border border-slate-800 rounded-3xl p-6 text-blue-500 font-mono text-2xl outline-none focus:border-blue-600 shadow-inner" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button onClick={() => executeBan("CONTEÚDO INFANTIL")} className="bg-red-600/10 hover:bg-red-600 border border-red-500/20 p-8 rounded-[2rem] transition-all group text-left">
+                      <ShieldAlert className="text-red-500 group-hover:text-white mb-4" size={24} />
+                      <p className="text-[10px] font-bold text-red-500 group-hover:text-white uppercase">Urgente</p>
+                      <p className="text-sm font-black text-white uppercase italic">C. Infantil</p>
+                    </button>
+                    <button onClick={() => executeBan("FRAUDE/SPAM")} className="bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 p-8 rounded-[2rem] transition-all group text-left">
+                      <Skull className="text-blue-500 group-hover:text-white mb-4" size={24} />
+                      <p className="text-[10px] font-bold text-blue-500 group-hover:text-white uppercase">Standard</p>
+                      <p className="text-sm font-black text-white uppercase italic">Fraude / Spam</p>
+                    </button>
+                  </div>
+                  
+                  {/* Novos Textos Facilitadores */}
+                  <div className="space-y-3 pt-4 border-t border-white/5">
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Modelos de Denúncia (Ajuda)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {modelosDenuncia.map((m, i) => (
+                        <button 
+                          key={i} 
+                          onClick={() => copyToConsole(m.text)}
+                          className="flex items-center gap-2 bg-slate-800/40 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition-all text-[10px] font-bold text-slate-400"
+                        >
+                          <Copy size={12} /> {m.label}
+                        </button>
+                      ))}
                     </div>
-
-                    <!-- Script CP -->
-                    <div class="glass-card p-6 rounded-2xl border-l-4 border-red-600 shadow-xl bg-red-900/10">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-red-500 uppercase text-sm">Contra Exploração Infantil</h3>
-                            <button onclick="copyToClipboard('txt-cp')" class="text-[10px] bg-red-600 hover:bg-red-500 px-3 py-1 rounded-md font-bold uppercase transition">Copiar</button>
-                        </div>
-                        <textarea id="txt-cp" readonly class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-red-200 outline-none">URGENTE: Denuncio o número +55 (XX) XXXXX-XXXX por distribuição de conteúdo de exploração infantil (CSAM). Peço banimento imediato e preservação de logs para as autoridades competentes. Tolerância Zero.</textarea>
-                    </div>
-
-                    <!-- Script Conteúdo +18 (ADICIONADO) -->
-                    <div class="glass-card p-6 rounded-2xl border-l-4 border-purple-600 shadow-xl bg-purple-900/10">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-purple-400 uppercase text-sm">Contra Conteúdo +18 / Sexo</h3>
-                            <button onclick="copyToClipboard('txt-adulto')" class="text-[10px] bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded-md font-bold uppercase transition">Copiar</button>
-                        </div>
-                        <textarea id="txt-adulto" readonly class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-purple-200 outline-none">Prezada Equipe de Moderação, denuncio o número +55 (XX) XXXXX-XXXX por disseminação de conteúdo pornográfico explícito e venda de material sexual em grupos e chats privados, o que viola as diretrizes de mídia do WhatsApp.</textarea>
-                    </div>
-
-                    <!-- Script Spam / Assédio -->
-                    <div class="glass-card p-6 rounded-2xl border-l-4 border-green-600 shadow-xl bg-green-900/10">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-green-400 uppercase text-sm">Contra Spam / Invasão</h3>
-                            <button onclick="copyToClipboard('txt-spam')" class="text-[10px] bg-green-600 hover:bg-green-500 px-3 py-1 rounded-md font-bold uppercase transition">Copiar</button>
-                        </div>
-                        <textarea id="txt-spam" readonly class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-green-200 outline-none">Suporte, solicito a verificação do número +55 (XX) XXXXX-XXXX por envio massivo de mensagens não solicitadas (Spam) e assédio constante a diversos usuários, perturbando o ambiente da plataforma.</textarea>
-                    </div>
+                  </div>
                 </div>
-            </div>
-
-            <!-- ABA 2: CONSULTA -->
-            <div id="consulta" class="tab-content">
-                <div class="glass-card p-10 rounded-2xl text-center max-w-2xl mx-auto border-t-4 border-blue-500">
-                    <h2 class="text-2xl font-orbitron font-bold text-blue-400 mb-6 uppercase">Sistema de Verificação</h2>
-                    <p class="text-slate-400 text-sm mb-6 italic">Insira o número alvo abaixo para consultar no banco de dados.</p>
-                    <div class="flex flex-col md:flex-row gap-2">
-                        <input type="text" id="search-input" placeholder="Ex: 11988887777" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition text-center font-mono">
-                        <button onclick="searchNumber()" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest transition">Verificar</button>
-                    </div>
-                    <div id="search-result" class="mt-8 hidden p-6 rounded-xl border text-sm animate-pulse"></div>
+              </div>
+              {consoleLogs.length > 0 && (
+                <div className="bg-black/90 border border-slate-800 p-6 rounded-3xl font-mono text-[10px] text-green-500 h-44 overflow-y-auto shadow-2xl">
+                  {consoleLogs.map((l, i) => <div key={i} className="mb-1">{l}</div>)}
                 </div>
+              )}
             </div>
+          )}
 
-            <!-- ABA 3: BLACKLIST -->
-            <div id="blacklist" class="tab-content">
-                <div class="glass-card p-6 rounded-2xl overflow-hidden">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold text-red-500 uppercase flex items-center gap-2 font-orbitron">
-                            <span>💀</span> Base de Alvos
-                        </h2>
-                        <span class="text-[9px] bg-slate-800 px-2 py-1 rounded text-slate-400">SYNC ATIVA</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-widest">
-                                <tr>
-                                    <th class="p-4 border-b border-slate-800">Identificador</th>
-                                    <th class="p-4 border-b border-slate-800">Infração</th>
-                                    <th class="p-4 border-b border-slate-800 text-center">Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800" id="blacklist-table">
-                                <tr>
-                                    <td class="p-4 font-mono text-blue-400">+55 11 93241-XXXX</td>
-                                    <td class="p-4 text-xs">Venda de Golpe (CPX)</td>
-                                    <td class="p-4 text-center"><span class="status-badge badge-banned">BANIDO</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-4 font-mono text-blue-400">+55 21 99912-XXXX</td>
-                                    <td class="p-4 text-xs">Conteúdo Adulto</td>
-                                    <td class="p-4 text-center"><span class="status-badge badge-banned">BANIDO</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-4 font-mono text-blue-400">+55 31 98823-XXXX</td>
-                                    <td class="p-4 text-xs">Fraude Bancária</td>
-                                    <td class="p-4 text-center"><span class="status-badge badge-pending">EM FILA</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+          {activeTab === 'blacklist' && (
+            <div className="bg-slate-900/20 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="text-[10px] text-slate-500 uppercase font-bold bg-black/20">
+                    <tr><th className="p-6">Alvo</th><th className="p-6">Motivo</th><th className="p-6">Agente</th><th className="p-6 text-right">Data</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs">
+                    {blacklist.map((item) => (
+                      <tr key={item.id} className="hover:bg-white/5">
+                        <td className="p-6 font-mono text-blue-400 font-bold">{item.number}</td>
+                        <td className="p-6"><span className="text-[9px] bg-red-600/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg font-black uppercase">{item.motivo}</span></td>
+                        <td className="p-6 text-slate-400 font-bold">{item.autor}</td>
+                        <td className="p-6 text-right text-[10px] text-slate-600 font-mono">{item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString() : 'Recent'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
 
-            <!-- ABA 4: DEPOIMENTOS -->
-            <div id="depoimentos" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="glass-card p-6 rounded-2xl border-b-4 border-blue-500">
-                        <p class="text-sm text-slate-300 italic mb-4">"O número do golpista que tentou clonar o meu WhatsApp caiu em menos de 2 horas depois que usei o script do JR!"</p>
-                        <div class="flex items-center gap-3">
-                            <div class="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">A.G</div>
-                            <span class="text-xs font-bold text-slate-500 uppercase">Usuário Verificado</span>
-                        </div>
-                    </div>
-                    <div class="glass-card p-6 rounded-2xl border-b-4 border-purple-500">
-                        <p class="text-sm text-slate-300 italic mb-4">"Limparam um grupo de vendas que só tinha conteúdo impróprio. O painel é top demais!"</p>
-                        <div class="flex items-center gap-3">
-                            <div class="h-10 w-10 bg-purple-600 rounded-full flex items-center justify-center font-bold">M.B</div>
-                            <span class="text-xs font-bold text-slate-500 uppercase">Vítima de Spam</span>
-                        </div>
-                    </div>
-                </div>
+          {activeTab === 'monitoramento' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-blue-600/5 border border-blue-500/20 p-8 rounded-[2rem] text-center"><Users size={30} className="text-blue-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Agentes</h4><p className="text-4xl font-black text-white mt-2">{adminUsers.length || '...'}</p></div>
+              <div className="bg-red-600/5 border border-red-500/20 p-8 rounded-[2rem] text-center"><Skull size={30} className="text-red-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Banimentos</h4><p className="text-4xl font-black text-white mt-2">{blacklist.length}</p></div>
+              <div className="bg-green-600/5 border border-green-500/20 p-8 rounded-[2rem] text-center"><Activity size={30} className="text-green-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Uptime</h4><p className="text-4xl font-black text-white mt-2">100%</p></div>
             </div>
+          )}
 
-            <!-- ABA 5: DICAS DE SEGURANÇA -->
-            <div id="seguranca" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="glass-card p-6 rounded-2xl border-t-2 border-yellow-500 bg-yellow-950/5">
-                        <h3 class="font-bold text-yellow-500 mb-4 uppercase flex items-center gap-2"><span>🛡️</span> Regras de Ouro</h3>
-                        <ul class="text-xs space-y-3 text-slate-400">
-                            <li>• Nunca clique em links de números desconhecidos.</li>
-                            <li>• Ative o PIN (Duas Etapas) agora mesmo.</li>
-                            <li>• Reporte primeiro pelo aplicativo e depois pelo Painel do JR.</li>
-                            <li>• Não compartilhe prints do painel com estranhos.</li>
-                        </ul>
+          {activeTab === 'logs' && (
+            <div className="max-w-3xl mx-auto space-y-3 bg-slate-900/20 p-6 rounded-[2.5rem] border border-white/5">
+              <div className="space-y-3 max-h-[600px] overflow-y-auto no-scrollbar">
+                {systemLogs.map(log => (
+                  <div key={log.id} className="bg-black/30 border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-blue-500/30 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-2 h-2 rounded-full ${log.type === 'login' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
+                      <p className="text-xs text-slate-300 font-medium">{log.msg}</p>
                     </div>
-                </div>
+                    <p className="text-[10px] text-slate-600 font-mono italic">{log.timestamp?.seconds ? new Date(log.timestamp.seconds * 1000).toLocaleTimeString() : '...'}</p>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
 
-            <!-- ABA 6: SUPORTE -->
-            <div id="suporte" class="tab-content">
-                <div class="glass-card p-10 rounded-2xl text-center">
-                    <h2 class="text-xl font-orbitron font-bold text-green-500 mb-6 uppercase">Centrais de Denúncia</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <a href="mailto:support@support.whatsapp.com" class="bg-slate-800 hover:bg-blue-600 p-6 rounded-xl transition-all font-bold uppercase text-xs">E-mail de Suporte Global</a>
-                        <a href="https://www.whatsapp.com/contact/" target="_blank" class="bg-slate-800 hover:bg-green-600 p-6 rounded-xl transition-all font-bold uppercase text-xs">Formulário Web Oficial</a>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <footer class="mt-20 py-10 border-t border-slate-900 text-center">
-            <p class="text-[10px] text-slate-600 font-orbitron tracking-[0.4em] uppercase">Painel do JR // Operação Defesa Digital // 2026</p>
-        </footer>
-
-    </main>
-
-    <!-- Notificações -->
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-8 py-3 rounded-full font-bold text-[10px] opacity-0 transition-all pointer-events-none uppercase tracking-widest z-[100]">
-        Script Copiado para a Área de Transferência
-    </div>
-
-    <script>
-        const bannedNumbers = ["11932418888", "21999124433", "31988231122"];
-
-        function openTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'border-blue-500'));
-            
-            document.getElementById(tabId).classList.add('active');
-            const btn = document.querySelector(`[data-tab="${tabId}"]`);
-            btn.classList.add('active', 'border-blue-500');
-        }
-
-        function copyToClipboard(id) {
-            const text = document.getElementById(id).value;
-            const temp = document.createElement('textarea');
-            temp.value = text;
-            document.body.appendChild(temp);
-            temp.select();
-            document.execCommand('copy');
-            document.body.removeChild(temp);
-            
-            showToast();
-        }
-
-        function showToast() {
-            const t = document.getElementById('toast');
-            t.style.opacity = '1';
-            t.style.transform = 'translate(-50%, -20px)';
-            setTimeout(() => {
-                t.style.opacity = '0';
-                t.style.transform = 'translate(-50%, 0px)';
-            }, 2500);
-        }
-
-        function searchNumber() {
-            const num = document.getElementById('search-input').value.trim().replace(/\D/g, '');
-            const res = document.getElementById('search-result');
-            res.classList.remove('hidden');
-
-            if (num === "") {
-                res.innerHTML = "INSIRA UM NÚMERO PARA CONSULTA";
-                res.className = "mt-8 p-6 rounded-xl border border-slate-700 text-slate-500 font-bold uppercase";
-                return;
-            }
-
-            if (bannedNumbers.some(b => b.includes(num))) {
-                res.innerHTML = "⚠️ ALVO CONFIRMADO! NÚMERO LISTADO NA BLACKLIST.";
-                res.className = "mt-8 p-6 rounded-xl border border-red-500 bg-red-950/30 text-red-500 font-bold uppercase";
-            } else {
-                res.innerHTML = "✅ NÚMERO NÃO CONSTA NA BASE DE DADOS DO PAINEL.";
-                res.className = "mt-8 p-6 rounded-xl border border-green-500 bg-green-950/30 text-green-500 font-bold uppercase";
-            }
-        }
-    </script>
-</body>
-</html>
-
-
-  
+          {activeTab === 'admin' && userName.toUpperCase() === 'JR' && (
+            <div className="bg-slate-900/30 border border-blue-600/20 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <div className="p-8 border-b border-white/5 bg-blue-600/10 flex items-center justify-between">
+                <div><h3 className="font-black text-sm uppercase tracking-widest text-blue-400 italic">Controlo de Acesso Root</h3></div>
+                <div className="p-3 bg-blue-600 rounded-2xl text-white font-black text-xs">DEV</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-black/40 text-slate-500 uppercase font-black text-[10px] tracking-widest">
+                    <tr><th className="p-8">Agente</th><th className="p-8">Senha</th><th className="p-8 text-right">Login</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {adminUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-blue-600/5 transition-all">
+                        <td className="p-8"><span className="font-black text-slate-200 uppercase tracking-tighter">{u.username}</span></td>
+                        <td className="p-8"><code className="bg-black/50 px-3 py-2 rounded-lg text-blue-400 font-mono border border-slate-800">{u.password}</code></td>
+                        <td className="p-8 text-right text-slate-500 font-mono text-[11px]">{u.lastLogin?.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Nunca'}</td>
+               
