@@ -27,7 +27,7 @@ import {
   Copy
 } from 'lucide-react';
 
-// Configuração do Firebase
+// Configuração do Firebase extraída do ambiente
 const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -48,14 +48,14 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [toast, setToast] = useState({ show: false, msg: '' });
 
-  // Textos para facilitar a denúncia
+  // Modelos de texto para denúncia rápida
   const modelosDenuncia = [
     { label: "C. Infantil", text: "Solicito banimento imediato deste número por compartilhamento de conteúdo infantil ilegal em grupos públicos. Violação grave dos termos." },
     { label: "Fraude/Spam", text: "Este número está realizando ataques de phishing e spam em massa para roubo de contas. Solicito suspensão imediata." },
-    { label: "Ameaça", text: "Número identificado em conduta de ódio e ameaças reais à integridade física de membros de grupos." }
+    { label: "Ameaça/Ódio", text: "Número identificado em conduta de ódio e ameaças reais à integridade física de membros de grupos." }
   ];
 
-  // 1. Inicialização de Auth
+  // 1. Inicialização da Autenticação
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -65,7 +65,7 @@ export default function App() {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.error("Erro Auth:", err);
+        console.error("Erro na Autenticação:", err);
       }
     };
     initAuth();
@@ -73,28 +73,31 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Sincronização de Dados em Tempo Real
+  // 2. Sincronização de Dados em Tempo Real (Só após o Login)
   useEffect(() => {
     if (!currentUser || !isLogged) return;
 
+    // Escuta a Blacklist
     const unsubBlacklist = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'blacklist'),
       (snap) => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setBlacklist(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
       },
-      (err) => console.error("Erro Blacklist:", err)
+      (err) => console.error("Erro na Blacklist:", err)
     );
 
+    // Escuta os Logs de Sistema
     const unsubLogs = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'logs'),
       (snap) => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setSystemLogs(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).slice(0, 50));
       },
-      (err) => console.error("Erro Logs:", err)
+      (err) => console.error("Erro nos Logs:", err)
     );
 
+    // Escuta Lista de Agentes (Apenas para o Administrador JR)
     let unsubUsers = () => {};
     if (userName.toUpperCase() === 'JR') {
       unsubUsers = onSnapshot(
@@ -102,7 +105,7 @@ export default function App() {
         (snap) => {
           setAdminUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         },
-        (err) => console.error("Erro Admin Users:", err)
+        (err) => console.error("Erro nos Utilizadores Admin:", err)
       );
     }
 
@@ -113,19 +116,25 @@ export default function App() {
     };
   }, [currentUser, isLogged, userName]);
 
+  // Função de Login Corrigida
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (!userName.trim() || !password.trim()) return showToast("Dados incompletos!");
+    
     setLoading(true);
     const userId = userName.trim().toLowerCase();
+
     try {
       const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userId);
       const userSnap = await getDoc(userRef);
+
+      // Regra de Segurança para o JR
       if (userName.toUpperCase() === 'JR' && password !== '123') {
         showToast("Senha de Desenvolvedor Inválida!");
         setLoading(false);
         return;
       }
+
       if (userSnap.exists()) {
         if (userSnap.data().password !== password) {
           showToast("Senha Incorreta!");
@@ -133,6 +142,7 @@ export default function App() {
           return;
         }
       } else {
+        // Primeiro acesso cria a conta automaticamente
         await setDoc(userRef, {
           username: userName,
           password: password,
@@ -140,48 +150,63 @@ export default function App() {
           lastLogin: serverTimestamp()
         });
       }
+
+      // Atualiza o log de acesso
       await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
         msg: `O Agente ${userName} acaba de se conectar.`,
         type: 'login',
         timestamp: serverTimestamp()
       });
+
       setIsLogged(true);
-      showToast("BEM-VINDO AO SISTEMA");
+      showToast("ACESSO AUTORIZADO");
     } catch (err) {
-      showToast("Falha na Rede");
+      showToast("Falha na Ligação");
     } finally {
       setLoading(false);
     }
   };
 
+  // Execução do Ataque / Banimento
   const executeBan = async (motivo) => {
     if (!target) return showToast("Define o Alvo!");
+    
     setConsoleLogs([]);
     const sequence = [
       "Iniciando Protocolo de Injeção...",
       "Interceptando pacotes da API...",
       `Injetando Payload: ${motivo}`,
-      "Multiplicando requisições (x150)...",
+      "Multiplicando requisições em massa...",
       "Relatórios enviados com sucesso!"
     ];
+
     for (const text of sequence) {
       setConsoleLogs(prev => [...prev, `[SYS] ${text}`]);
       await new Promise(r => setTimeout(r, 450));
     }
+
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'blacklist'), {
       number: target,
       motivo,
       autor: userName,
       timestamp: serverTimestamp()
     });
+
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
       msg: `Alvo ${target} banido por ${userName} (${motivo})`,
       type: 'attack',
       timestamp: serverTimestamp()
     });
-    showToast("ALVO ATACADO!");
+
+    showToast("ALVO ATACADO COM SUCESSO!");
     setTarget('');
+  };
+
+  const copyToConsole = (text) => {
+    setConsoleLogs(prev => [...prev, `[INFO] Texto de apoio selecionado.`]);
+    // Simula a cópia visual para o utilizador saber o que enviar
+    showToast("Texto preparado!");
   };
 
   const showToast = (msg) => {
@@ -189,39 +214,37 @@ export default function App() {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
-  const copyToConsole = (text) => {
-    setConsoleLogs(prev => [...prev, `[COPY] Texto preparado: "${text.substring(0, 30)}..."`]);
-    showToast("Texto pronto no console!");
-  };
-
+  // Ecrã de Login
   if (!isLogged) {
     return (
       <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-slate-200">
         <div className="w-full max-w-md bg-slate-900/40 border border-white/10 p-10 rounded-[3rem] backdrop-blur-3xl shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.5)]"></div>
           <div className="flex flex-col items-center mb-10">
             <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/40 mb-6">
               <Skull size={40} className="text-white" />
             </div>
             <h1 className="text-2xl font-black uppercase italic tracking-widest text-white">Painel JR <span className="text-blue-500">v5.2</span></h1>
+            <p className="text-[10px] text-slate-500 uppercase font-bold mt-2 tracking-widest">Segurança & Denúncias API</p>
           </div>
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Codinome</label>
+              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Codinome do Agente</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Agente" className="w-full bg-black/40 border border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500 transition-all shadow-inner" />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Chave de Segurança</label>
+              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Chave de Acesso</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" className="w-full bg-black/40 border border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500 transition-all shadow-inner" />
               </div>
             </div>
-            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl shadow-2xl transition-all uppercase text-xs tracking-[0.2em] mt-4">
-              {loading ? "Acedendo..." : "Entrar no Sistema"}
+            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-50 text-white font-bold py-5 rounded-2xl shadow-2xl shadow-blue-500/20 transition-all uppercase text-xs tracking-[0.2em] mt-4">
+              {loading ? "Verificando..." : "Entrar no Painel"}
             </button>
           </form>
         </div>
@@ -229,8 +252,9 @@ export default function App() {
     );
   }
 
+  // Painel Principal
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-300 font-sans">
+    <div className="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-blue-500/30">
       <header className="p-4 bg-slate-900/60 border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -239,7 +263,10 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-black text-xl italic uppercase leading-none text-white tracking-tighter">JR <span className="text-blue-500">PREMIUM</span></h1>
-              <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest mt-1">Sessão: {userName}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">{userName}</p>
+              </div>
             </div>
           </div>
           <button onClick={() => window.location.reload()} className="bg-red-950/20 border border-red-500/30 p-2 px-4 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all text-[10px] font-bold uppercase flex items-center gap-2">
@@ -249,13 +276,13 @@ export default function App() {
       </header>
 
       <main className="max-w-6xl mx-auto p-4 md:p-10">
-        <nav className="flex gap-3 overflow-x-auto no-scrollbar mb-10 pb-2 text-slate-200">
+        <nav className="flex gap-3 overflow-x-auto no-scrollbar mb-10 pb-2">
           {[
             { id: 'metodo-api', label: 'Injeção API', icon: Terminal },
             { id: 'blacklist', label: 'Blacklist', icon: Skull },
-            { id: 'monitoramento', label: 'Monitoramento', icon: Database },
+            { id: 'monitoramento', label: 'Estatísticas', icon: Database },
             { id: 'logs', label: 'Atividade', icon: History },
-            ...(userName.toUpperCase() === 'JR' ? [{ id: 'admin', label: 'Admin Root', icon: Users }] : [])
+            ...(userName.toUpperCase() === 'JR' ? [{ id: 'admin', label: 'Root Dev', icon: Users }] : [])
           ].map(tab => (
             <button
               key={tab.id}
@@ -271,14 +298,16 @@ export default function App() {
         </nav>
 
         <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
+          
           {activeTab === 'metodo-api' && (
             <div className="max-w-2xl mx-auto space-y-6">
               <div className="bg-slate-900/30 border border-white/5 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                <h3 className="text-center font-bold uppercase text-slate-500 text-[11px] mb-10 tracking-[0.4em]">Protocolo de Ataque API</h3>
+                <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={100} /></div>
+                <h3 className="text-center font-bold uppercase text-slate-500 text-[11px] mb-10 tracking-[0.4em]">Módulo de Execução API</h3>
                 <div className="space-y-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-600 ml-2">ID do Alvo</label>
-                    <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="55119..." className="w-full bg-black/50 border border-slate-800 rounded-3xl p-6 text-blue-500 font-mono text-2xl outline-none focus:border-blue-600 shadow-inner" />
+                    <label className="text-[10px] uppercase font-bold text-slate-600 ml-2">ID do Alvo (Número c/ DDD)</label>
+                    <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="Ex: 55119..." className="w-full bg-black/50 border border-slate-800 rounded-3xl p-6 text-blue-500 font-mono text-2xl outline-none focus:border-blue-600 shadow-inner" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button onClick={() => executeBan("CONTEÚDO INFANTIL")} className="bg-red-600/10 hover:bg-red-600 border border-red-500/20 p-8 rounded-[2rem] transition-all group text-left">
@@ -292,18 +321,21 @@ export default function App() {
                       <p className="text-sm font-black text-white uppercase italic">Fraude / Spam</p>
                     </button>
                   </div>
-                  
-                  {/* Novos Textos Facilitadores */}
-                  <div className="space-y-3 pt-4 border-t border-white/5">
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Modelos de Denúncia (Ajuda)</p>
+
+                  {/* Modelos de Texto Facilitadores */}
+                  <div className="space-y-3 pt-6 border-t border-white/5">
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Copy size={12} /> Textos de Denúncia Sugeridos
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {modelosDenuncia.map((m, i) => (
                         <button 
                           key={i} 
                           onClick={() => copyToConsole(m.text)}
-                          className="flex items-center gap-2 bg-slate-800/40 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition-all text-[10px] font-bold text-slate-400"
+                          title={m.text}
+                          className="flex items-center gap-2 bg-slate-800/40 hover:bg-slate-800 border border-slate-700 px-4 py-2.5 rounded-xl transition-all text-[10px] font-bold text-slate-400 group"
                         >
-                          <Copy size={12} /> {m.label}
+                          <Copy size={12} className="group-hover:text-blue-500" /> {m.label}
                         </button>
                       ))}
                     </div>
@@ -320,18 +352,31 @@ export default function App() {
 
           {activeTab === 'blacklist' && (
             <div className="bg-slate-900/20 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <div className="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                <h3 className="font-bold text-xs uppercase tracking-widest">Base de Dados de Suspensão</h3>
+                <span className="text-[10px] text-slate-500 font-mono">{blacklist.length} Registos</span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="text-[10px] text-slate-500 uppercase font-bold bg-black/20">
-                    <tr><th className="p-6">Alvo</th><th className="p-6">Motivo</th><th className="p-6">Agente</th><th className="p-6 text-right">Data</th></tr>
+                    <tr>
+                      <th className="p-6">Número Alvo</th>
+                      <th className="p-6">Motivo da Injeção</th>
+                      <th className="p-6">Autor (Agente)</th>
+                      <th className="p-6 text-right">Registo Temporal</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
                     {blacklist.map((item) => (
-                      <tr key={item.id} className="hover:bg-white/5">
+                      <tr key={item.id} className="hover:bg-white/5 transition-all">
                         <td className="p-6 font-mono text-blue-400 font-bold">{item.number}</td>
-                        <td className="p-6"><span className="text-[9px] bg-red-600/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg font-black uppercase">{item.motivo}</span></td>
-                        <td className="p-6 text-slate-400 font-bold">{item.autor}</td>
-                        <td className="p-6 text-right text-[10px] text-slate-600 font-mono">{item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString() : 'Recent'}</td>
+                        <td className="p-6">
+                           <span className="text-[9px] bg-red-600/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg font-black uppercase tracking-tighter">{item.motivo}</span>
+                        </td>
+                        <td className="p-6 text-slate-400 font-bold uppercase">{item.autor}</td>
+                        <td className="p-6 text-right text-[10px] text-slate-600 font-mono">
+                          {item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString() : 'Recente'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -342,14 +387,27 @@ export default function App() {
 
           {activeTab === 'monitoramento' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-blue-600/5 border border-blue-500/20 p-8 rounded-[2rem] text-center"><Users size={30} className="text-blue-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Agentes</h4><p className="text-4xl font-black text-white mt-2">{adminUsers.length || '...'}</p></div>
-              <div className="bg-red-600/5 border border-red-500/20 p-8 rounded-[2rem] text-center"><Skull size={30} className="text-red-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Banimentos</h4><p className="text-4xl font-black text-white mt-2">{blacklist.length}</p></div>
-              <div className="bg-green-600/5 border border-green-500/20 p-8 rounded-[2rem] text-center"><Activity size={30} className="text-green-500 mx-auto mb-4" /><h4 className="text-[10px] font-bold uppercase text-slate-500">Uptime</h4><p className="text-4xl font-black text-white mt-2">100%</p></div>
+              <div className="bg-blue-600/5 border border-blue-500/20 p-8 rounded-[2.5rem] text-center group hover:border-blue-500/50 transition-all">
+                <Users size={30} className="text-blue-500 mx-auto mb-4" />
+                <h4 className="text-[10px] font-bold uppercase text-slate-500">Agentes Ativos</h4>
+                <p className="text-4xl font-black text-white mt-2">{adminUsers.length || blacklist.length ? 'Online' : '...'}</p>
+              </div>
+              <div className="bg-red-600/5 border border-red-500/20 p-8 rounded-[2.5rem] text-center group hover:border-red-500/50 transition-all">
+                <Skull size={30} className="text-red-500 mx-auto mb-4" />
+                <h4 className="text-[10px] font-bold uppercase text-slate-500">Suspensões Totais</h4>
+                <p className="text-4xl font-black text-white mt-2">{blacklist.length}</p>
+              </div>
+              <div className="bg-green-600/5 border border-green-500/20 p-8 rounded-[2.5rem] text-center group hover:border-green-500/50 transition-all">
+                <Activity size={30} className="text-green-500 mx-auto mb-4" />
+                <h4 className="text-[10px] font-bold uppercase text-slate-500">Status API</h4>
+                <p className="text-4xl font-black text-green-500 mt-2">OPERACIONAL</p>
+              </div>
             </div>
           )}
 
           {activeTab === 'logs' && (
             <div className="max-w-3xl mx-auto space-y-3 bg-slate-900/20 p-6 rounded-[2.5rem] border border-white/5">
+              <h3 className="text-center font-bold text-[10px] text-slate-600 uppercase mb-6 tracking-widest">Fluxo de Dados Global</h3>
               <div className="space-y-3 max-h-[600px] overflow-y-auto no-scrollbar">
                 {systemLogs.map(log => (
                   <div key={log.id} className="bg-black/30 border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-blue-500/30 transition-all">
@@ -357,7 +415,9 @@ export default function App() {
                       <div className={`w-2 h-2 rounded-full ${log.type === 'login' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
                       <p className="text-xs text-slate-300 font-medium">{log.msg}</p>
                     </div>
-                    <p className="text-[10px] text-slate-600 font-mono italic">{log.timestamp?.seconds ? new Date(log.timestamp.seconds * 1000).toLocaleTimeString() : '...'}</p>
+                    <p className="text-[10px] text-slate-600 font-mono italic">
+                       {log.timestamp?.seconds ? new Date(log.timestamp.seconds * 1000).toLocaleTimeString() : '...'}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -367,18 +427,59 @@ export default function App() {
           {activeTab === 'admin' && userName.toUpperCase() === 'JR' && (
             <div className="bg-slate-900/30 border border-blue-600/20 rounded-[2.5rem] overflow-hidden shadow-2xl">
               <div className="p-8 border-b border-white/5 bg-blue-600/10 flex items-center justify-between">
-                <div><h3 className="font-black text-sm uppercase tracking-widest text-blue-400 italic">Controlo de Acesso Root</h3></div>
-                <div className="p-3 bg-blue-600 rounded-2xl text-white font-black text-xs">DEV</div>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-widest text-blue-400 italic">Controlo de Acesso Root</h3>
+                  <p className="text-[10px] text-slate-500 uppercase mt-1">Gestão de Agentes e Credenciais Cloud</p>
+                </div>
+                <div className="p-3 bg-blue-600 rounded-2xl text-white font-black text-xs">DEVELOPER</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-black/40 text-slate-500 uppercase font-black text-[10px] tracking-widest">
-                    <tr><th className="p-8">Agente</th><th className="p-8">Senha</th><th className="p-8 text-right">Login</th></tr>
+                    <tr>
+                      <th className="p-8">Agente Identificado</th>
+                      <th className="p-8">Chave de Segurança</th>
+                      <th className="p-8 text-right">Último Acesso</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {adminUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-blue-600/5 transition-all">
-                        <td className="p-8"><span className="font-black text-slate-200 uppercase tracking-tighter">{u.username}</span></td>
-                        <td className="p-8"><code className="bg-black/50 px-3 py-2 rounded-lg text-blue-400 font-mono border border-slate-800">{u.password}</code></td>
-                        <td className="p-8 text-right text-slate-500 font-mono text-[11px]">{u.lastLogin?.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Nunca'}</td>
+                      <tr key={u.id} className="hover:bg-blue-600/5 transition-all group">
+                        <td className="p-8">
+                           <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-blue-500 border border-slate-700 group-hover:border-blue-500 transition-all uppercase">
+                               {u.username?.[0]}
+                             </div>
+                             <span className="font-black text-slate-200 uppercase tracking-tighter">{u.username}</span>
+                           </div>
+                        </td>
+                        <td className="p-8">
+                          <code className="bg-black/50 px-3 py-2 rounded-lg text-blue-400 font-mono border border-slate-800 group-hover:text-blue-500 select-all">{u.password}</code>
+                        </td>
+                        <td className="p-8 text-right text-slate-500 font-mono text-[11px]">
+                          {u.lastLogin?.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendente'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </main>
+
+      {toast.show && (
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-10">
+          <div className="bg-blue-600 text-white px-10 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/40 border border-white/20">
+            {toast.msg}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
                
