@@ -6,76 +6,44 @@
     <title>S.I.D. ALPHA V10</title>
     <style>
         body { 
-            background-color: #0a0a0a; color: #fff; font-family: sans-serif; 
-            margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; 
+            background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), 
+                        url('https://raw.githubusercontent.com/latancunha-hue/analisador/main/1000159768.jpg'); 
+            background-size: cover; background-position: center; background-attachment: fixed;
+            color: white; font-family: sans-serif; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; 
         }
-        
-        /* Cabeçalho igual à imagem 1000160662.jpg */
-        .header { 
-            border: 1px solid #00ff00; width: 100%; max-width: 500px; 
-            text-align: center; padding: 10px; margin-bottom: 15px; background: rgba(0,255,0,0.05);
-        }
-        .header h1 { color: #00ff00; font-size: 18px; margin: 0; letter-spacing: 1px; }
-
-        input { 
-            width: 100%; max-width: 500px; padding: 12px; background: #000; 
-            border: 1px solid #00ff00; border-radius: 5px; color: #00ff00; 
-            margin-bottom: 15px; box-sizing: border-box; outline: none;
-        }
-
-        /* Grade de botões coloridos igual ao seu modelo original */
+        .header { border: 1px solid #00ff00; width: 100%; max-width: 500px; text-align: center; padding: 10px; margin-bottom: 15px; background: rgba(0,0,0,0.7); }
+        .header h1 { color: #00ff00; font-size: 18px; margin: 0; }
+        input { width: 100%; max-width: 500px; padding: 15px; background: rgba(0,0,0,0.9); border: 1px solid #00ff00; color: #00ff00; margin-bottom: 15px; box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 500px; }
-        
-        button { 
-            padding: 15px; border: none; border-radius: 5px; color: black; 
-            font-weight: bold; font-size: 11px; cursor: pointer; text-transform: uppercase;
-        }
-
-        .btn-scan { background: #00ff00; } /* VERDE */
-        .btn-decoder { background: #ffcc00; } /* AMARELO */
-        .btn-zap { background: #9933ff; color: white; } /* ROXO */
-        .btn-deep { background: #00ff88; } /* CIANO */
-        .btn-busca { background: #9933ff; color: white; } /* ROXO */
-        .btn-telegram { background: #00ccff; } /* AZUL */
+        button { padding: 15px; border: none; border-radius: 5px; color: black; font-weight: bold; font-size: 11px; cursor: pointer; text-transform: uppercase; }
+        .btn-scan { background: #00ff00; } 
+        .btn-decoder { background: #ffcc00; } 
+        .btn-ip { background: #9933ff; color: white; } 
+        .btn-deep { background: #00ffcc; } 
+        .btn-foto { background: #9933ff; color: white; } 
+        .btn-tele { background: #00ccff; } 
         .btn-clear { background: #333; color: white; grid-column: span 2; margin-top: 5px; }
-
-        /* Console estilizado com auto-scroll */
-        #console { 
-            width: 100%; max-width: 500px; height: 320px; background: #000; 
-            margin-top: 15px; border: 1px solid #00ff00; padding: 10px; 
-            font-family: monospace; font-size: 11px; overflow-y: auto; color: #00ff00;
-            box-sizing: border-box; white-space: pre-wrap;
-        }
+        #console { width: 100%; max-width: 500px; height: 350px; background: rgba(0,0,0,0.9); border: 1px solid #00ff00; margin-top: 15px; padding: 10px; font-family: monospace; font-size: 11px; overflow-y: auto; color: #00ff00; white-space: pre-wrap; box-sizing: border-box; }
         .log-error { color: #ff3333; }
         .log-hook { color: #3399ff; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>S.I.D. ALPHA V10 [OSINT REAL-TIME]</h1>
-        <small style="color: #666;">MODO: INVESTIGAÇÃO DE CAMPO ATIVO</small>
-    </div>
-
-    <input type="text" id="target" placeholder="INSIRA URL DO GOLPE OU IP...">
-
+    <div class="header"><h1>S.I.D. ALPHA V10 [OSINT]</h1></div>
+    <input type="text" id="target" placeholder="COLE O LINK OU IP AQUI...">
     <div class="grid">
         <button class="btn-scan" onclick="realScan()">SCAN RÁPIDO</button>
-        <button class="btn-decoder" onclick="log('Módulo Decoder em manutenção', 'log-error')">DECODER VAZAMENTOS</button>
-        <button class="btn-zap" onclick="realIpTrace()">IP TRACE REAL</button>
-        <button class="btn-deep" onclick="log('Base de dados offline', 'log-error')">BUSCA PROFUNDA</button>
-        <button class="btn-busca" onclick="log('Módulo de imagem requer API', 'log-hook')">BUSCA POR FOTO</button>
-        <button class="btn-telegram" onclick="log('Conectando ao bot...', 'log-hook')">BOTS TELEGRAM</button>
+        <button class="btn-decoder" onclick="log('Módulo offline', 'log-error')">DECODER VAZAMENTOS</button>
+        <button class="btn-ip" onclick="realIpTrace()">IP TRACE REAL</button>
+        <button class="btn-deep" onclick="log('Base offline', 'log-error')">BUSCA PROFUNDA</button>
+        <button class="btn-foto" onclick="log('Aguardando API', 'log-hook')">BUSCA POR FOTO</button>
+        <button class="btn-tele" onclick="log('Conectando...', 'log-hook')">BOTS TELEGRAM</button>
         <button class="btn-clear" onclick="clearLog()">LIMPAR CONSOLE</button>
     </div>
-
-    <div id="console">
-        <div>[SYSTEM] S.I.D. ALPHA V10 ONLINE. AGUARDANDO COMANDO...</div>
-    </div>
+    <div id="console"><div>[SYSTEM] V10 PRONTO. AGUARDANDO ALVO...</div></div>
 
     <script>
         const consoleEl = document.getElementById('console');
-
         function log(msg, type = '') {
             const div = document.createElement('div');
             div.className = type;
@@ -84,43 +52,46 @@
             consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
-        // Função corrigida para puxar o código do site alvo
         async function realScan() {
             const val = document.getElementById('target').value;
             if(!val) return log('Erro: Digite a URL.', 'log-error');
             log(`Hooking target: ${val}`, 'log-hook');
+            
+            // NOVO MÉTODO: Usa o proxy do CorsProxy.io que é mais estável
             try {
-                // Bypass CORS para ler o site real
-                const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(val)}`);
-                const d = await r.json();
-                if(d.contents) {
-                    log('CONEXÃO ESTABELECIDA. CÓDIGO CAPTURADO:');
-                    log(d.contents.substring(0, 1500)); 
-                    log('FIM DA CAPTURA.', 'log-hook');
-                } else { log('O alvo bloqueou a conexão.', 'log-error'); }
-            } catch (e) { log('Falha crítica no Deep Scan.', 'log-error'); }
+                const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(val)}`);
+                if (!r.ok) throw new Error('Bloqueio de segurança detectado.');
+                const d = await r.text();
+                log('CÓDIGO CAPTURADO COM SUCESSO:');
+                log(d.substring(0, 2000)); // Puxa mais código pra você analisar
+            } catch (e) {
+                log('ERRO: Tentando método secundário...', 'log-error');
+                try {
+                    const r2 = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(val)}`);
+                    const d2 = await r2.json();
+                    log(d2.contents.substring(0, 1500));
+                } catch (e2) {
+                    log('FALHA: O site alvo possui proteção anti-bot avançada.', 'log-error');
+                }
+            }
         }
 
-        // Função corrigida para IP Trace com dados reais
         async function realIpTrace() {
             const ip = document.getElementById('target').value;
-            if(!ip) return log('Erro: Digite o IP no campo acima.', 'log-error');
-            log(`Rastreando IP: ${ip}`, 'log-hook');
+            if(!ip) return log('Erro: Digite o IP.', 'log-error');
+            log(`Rastreando: ${ip}`, 'log-hook');
             try {
-                const r = await fetch(`https://ipwho.is/${ip}`);
+                const r = await fetch(`https://ipapi.co/${ip}/json/`);
                 const d = await r.json();
-                if(d.success) {
-                    log(`LOCAL: ${d.city}, ${d.region} - ${d.country}`);
-                    log(`ISP/ORG: ${d.connection.isp}`);
-                    log(`COORD: ${d.latitude}, ${d.longitude}`);
-                } else { log('IP não encontrado.', 'log-error'); }
-            } catch (e) { log('Erro no servidor de rastreio.', 'log-error'); }
+                log(`LOCAL: ${d.city}/${d.region} | ISP: ${d.org}`);
+            } catch (e) { log('Erro no rastreio.', 'log-error'); }
         }
 
         function clearLog() { consoleEl.innerHTML = '<div>[TERMINAL LIMPO]</div>'; }
     </script>
 </body>
 </html>
+
 
 
 
