@@ -5,157 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S.I.D. ALPHA V10 | OSINT</title>
     <style>
-        :root {
-            --primary: #00ff41; /* Verde Matrix */
-            --bg: #0a0a0a;
-            --card: #1a1a1a;
-            --text: #ffffff;
-            --danger: #ff4b2b;
-        }
-
-        body {
-            background-color: var(--bg);
+        :root { --primary: #00ff41; --bg: #050505; --card: rgba(26, 26, 26, 0.9); --text: #ffffff; }
+        
+        body { 
+            background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), 
+                        url('https://raw.githubusercontent.com/latancunha-hue/analisador/main/1000159443.jpg'); /* Usa sua foto do lobo */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             color: var(--text);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
+        .header { text-align: center; margin-bottom: 20px; border: 1px solid var(--primary); padding: 10px; background: rgba(0,0,0,0.7); width: 100%; max-width: 500px; box-sizing: border-box; }
+        .header h1 { color: var(--primary); font-size: 20px; margin: 0; text-shadow: 0 0 10px var(--primary); }
+
+        .search-container { width: 100%; max-width: 500px; margin-bottom: 15px; }
+        input { 
+            width: 100%; padding: 15px; 
+            background: rgba(0,0,0,0.8); 
+            border: 1px solid var(--primary); 
+            border-radius: 4px; color: var(--primary); 
+            box-sizing: border-box; outline: none; 
+            box-shadow: inset 0 0 5px var(--primary);
         }
 
-        .header h1 {
-            color: var(--primary);
-            font-size: 24px;
-            margin: 0;
-            letter-spacing: 2px;
+        .grid-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; width: 100%; max-width: 500px; }
+        button { 
+            padding: 12px; border: 1px solid #444; 
+            border-radius: 2px; background: var(--card); 
+            color: white; font-weight: bold; font-size: 10px; 
+            cursor: pointer; text-transform: uppercase;
         }
+        button:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-main { background: var(--primary) !important; color: black !important; }
 
-        .search-container {
-            width: 100%;
-            max-width: 500px;
-            position: relative;
-            margin-bottom: 25px;
+        #console { 
+            width: 100%; max-width: 500px; height: 280px; 
+            background: rgba(0, 0, 0, 0.85); 
+            margin-top: 15px; border: 1px solid var(--primary); 
+            padding: 12px; font-size: 11px; overflow-y: auto; 
+            box-sizing: border-box; color: #00ff41;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
         }
-
-        input {
-            width: 100%;
-            padding: 15px;
-            background: var(--card);
-            border: 1px solid #333;
-            border-radius: 8px;
-            color: white;
-            box-sizing: border-box;
-        }
-
-        .grid-tools {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        button {
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            background: var(--card);
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-            text-transform: uppercase;
-            font-size: 11px;
-            border-bottom: 2px solid #333;
-        }
-
-        button:active { transform: scale(0.95); }
-
-        .btn-main { background: var(--primary); color: black; }
-        .btn-active { border-color: var(--primary); }
-
-        #console {
-            width: 100%;
-            max-width: 500px;
-            height: 200px;
-            background: #000;
-            margin-top: 25px;
-            border-radius: 8px;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            overflow-y: auto;
-            border: 1px solid #222;
-            box-sizing: border-box;
-        }
-
-        .log-info { color: var(--primary); }
-        .log-error { color: var(--danger); }
+        .log-error { color: #ff4b2b; }
         .log-hook { color: #008cff; }
     </style>
 </head>
 <body>
-
     <div class="header">
         <h1>S.I.D. ALPHA V10</h1>
-        <small style="opacity: 0.5;">REAL-TIME ANALYTICS</small>
+        <small style="color: #888;">MODO: INVESTIGAÇÃO ATIVA (OSINT)</small>
     </div>
 
     <div class="search-container">
-        <input type="text" id="target" placeholder="ENTER TARGET URL OR DATA...">
+        <input type="text" id="target" placeholder="DIGITE URL, IP OU NOME...">
     </div>
 
     <div class="grid-tools">
-        <button class="btn-main" onclick="scan()">Deep Scan</button>
-        <button onclick="log('Extrator de Metadados Ativo...')">Metadata Extractor</button>
-        <button onclick="log('Acessando Painel Dioneel...')">Dioneel Web</button>
-        <button onclick="log('Monitorando Dark Web...')">Dark Monitor</button>
-        <button onclick="log('Buscando Redes Sociais...')">Socials Harvester</button>
-        <button onclick="log('Consultando Operadora...')">Phone Lookup</button>
-        <button onclick="log('Verificador de CPF/CNPJ...')">Verifier</button>
-        <button onclick="log('Rastreando IP...')">IP Trace</button>
-        <button onclick="log('Obtendo Coordenadas...')">Geo-Location</button>
-        <button style="background: #333;" onclick="clearLog()">Limpar Console</button>
+        <button class="btn-main" onclick="deepScan()">DEEP SCAN</button>
+        <button onclick="ipTrace()">IP TRACE</button>
+        <button onclick="log('Módulo Metadata em manutenção', 'log-error')">METADATA</button>
+        <button onclick="log('Dioneel Web offline', 'log-error')">DIONEEL WEB</button>
+        <button onclick="log('Busca por foto requer API externa', 'log-hook')">BUSCA POR FOTO</button>
+        <button onclick="log('Monitorando Dark Web...', 'log-hook')">DARK MONITOR</button>
+        <button style="grid-column: span 2; background: #333;" onclick="clearLog()">LIMPAR TERMINAL</button>
     </div>
 
     <div id="console">
-        <div class="log-info">[INFO] S.I.D. V10 booting up...</div>
-        <div class="log-info">[READY] System online.</div>
+        <div>[SYSTEM] S.I.D. ALPHA V10 INICIALIZADO...</div>
+        <div>[STATUS] AGUARDANDO ENTRADA DE DADOS.</div>
     </div>
 
     <script>
         const consoleEl = document.getElementById('console');
-
-        function log(msg, type = 'info') {
+        function log(msg, className = '') {
             const div = document.createElement('div');
-            div.className = `log-${type}`;
-            div.innerHTML = `[${type.toUpperCase()}] ${msg}`;
+            div.className = className;
+            div.innerText = `> ${msg}`;
             consoleEl.appendChild(div);
             consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
-        function scan() {
-            const target = document.getElementById('target').value;
-            if(!target) return log('Target vazio!', 'error');
-            
-            log(`Hooking target: ${target}`, 'hook');
-            setTimeout(() => {
-                log('Injected scripts detected...', 'info');
-                log('Analyzing source code...', 'info');
-                log('Possible phishing/scam detected in CSS/JS.', 'error');
-            }, 1000);
+        async function deepScan() {
+            const url = document.getElementById('target').value;
+            if(!url) return log('URL alvo necessária!', 'log-error');
+            log(`Hooking target: ${url}`, 'log-hook');
+            try {
+                const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+                const data = await res.json();
+                if(data.contents) {
+                    log('CÓDIGO FONTE CAPTURADO:', 'log-hook');
+                    log(data.contents.substring(0, 1200));
+                    log('SCAN CONCLUÍDO.', 'log-hook');
+                }
+            } catch (e) { log('Falha no Hook: ' + e.message, 'log-error'); }
         }
 
-        function clearLog() {
-            consoleEl.innerHTML = '<div class="log-info">[CLEARED] System ready.</div>';
+        async function ipTrace() {
+            const ip = document.getElementById('target').value;
+            if(!ip) return log('IP necessário!', 'log-error');
+            log(`Rastreando IP: ${ip}`, 'log-hook');
+            try {
+                const res = await fetch(`https://ipapi.co/${ip}/json/`);
+                const data = await res.json();
+                if(data.city) {
+                    log(`LOCAL: ${data.city}, ${data.region} - ${data.country_name}`);
+                    log(`ORG: ${data.org}`);
+                } else { log('IP inválido.', 'log-error'); }
+            } catch (e) { log('Erro: ' + e.message, 'log-error'); }
         }
+
+        function clearLog() { consoleEl.innerHTML = '<div>[TERMINAL LIMPO]</div>'; }
     </script>
 </body>
 </html>
+
 
